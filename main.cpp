@@ -1,6 +1,7 @@
 #include "LinkedList.hpp"
 #include "Vector.hpp"
 #include "Array.hpp"
+#include "Deque.hpp"
 #include <string>
 #include <iostream>
 
@@ -53,5 +54,10 @@ int main() {
         std::cout << "Index of 10: " << arr.find(10) << std::endl;
     }
 
+    Deque<int> deque;
+    int x = 10;
+    deque.insert(x);
+    std::cout << deque[0] << std::endl;
+    std::cout << deque.contains(10) << std::endl;
     /* ... more examples here */
 }

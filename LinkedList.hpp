@@ -2,6 +2,7 @@
 #include <memory>
 #include <limits>
 #include <cstdio>
+#include <functional>
 
 namespace gdamn::data {
 
@@ -94,6 +95,8 @@ public:
         friend LinkedList;
     };
 
+    void for_each(std::function<void(T&)> call_back);
+
     void insert(T& key);
     void insert(T&& key);
     void insert_front(T& key);
@@ -145,6 +148,11 @@ LinkedList<T, alloc>::~LinkedList() {
 template<typename T, typename alloc>
 LinkedList<T, alloc>::LinkedList(std::initializer_list<T> list) {
     for(auto& i : list) insert(i);
+}
+
+template<typename T, typename alloc>
+void LinkedList<T, alloc>::for_each(std::function<void(T&)> call_back) {
+    for(auto& val : *this) call_back(val);
 }
 
 template<typename T, typename alloc>

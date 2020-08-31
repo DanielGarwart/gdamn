@@ -3,6 +3,7 @@
 #include <initializer_list>
 #include <limits>
 #include <cstring>
+#include <functional>
 
 namespace gdamn::data {
 
@@ -16,6 +17,8 @@ public:
     
     Array<T, n>& operator=(Array<T, n>& other);
     Array<T, n>& operator=(Array<T, n>&& other);
+
+    void for_each(std::function<void(T&)> call_back);
 
     bool contains(T& key);
     bool contains(T&& key);
@@ -36,7 +39,7 @@ public:
             return (this->index == other.index && this->beg == other.beg);
         }
 
-        bool operator!=(Iterator other) {
+        bool operator!=(const Iterator other) {
             return !(*this == other);
         }
 
@@ -45,16 +48,17 @@ public:
             return beg[index]; 
         }
     private:
-        Iterator(T* beg) { this->beg = beg; }
+        Iterator(T* beg, size_t i = 0) { this->beg = beg; index = i; }
+        friend Array;
         T* beg;
-        size_t index = 0;
+        size_t index;
     };
 
-    constexpr inline size_t len()       { return n; }
-    inline T& operator[](size_t i)      { return data[i]; }
-    inline Iterator begin()             { return Iterator(data); }
-    inline Iterator end()               { return Iterator(nullptr); };
-    inline T* first()                   { return data; }
+    constexpr size_t len()       { return n; }
+    T& operator[](size_t i)      { return data[i]; }
+    Iterator begin()             { return Iterator(data); }
+    Iterator end()               { return Iterator(data, len()); };
+    T* first()                   { return data; }
 private:
     T data[n];
 };
@@ -80,6 +84,12 @@ Array<T, n>& Array<T, n>::operator=(Array<T, n>&& other) {
     this->data = other.data;
     other.data = nullptr;
     return *this;
+}
+
+template<typename T, size_t n>
+void Array<T, n>::for_each(std::function<void(T&)> call_back) {
+    for(auto& val : *this)
+        call_back(val);
 }
 
 template<typename T, size_t n>

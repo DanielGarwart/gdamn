@@ -3,6 +3,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <functional>
 
 namespace gdamn::data {
 
@@ -61,12 +62,13 @@ public:
     };
 
     Vector();
-    Vector(size_t n);
+    explicit Vector(size_t n); /* Make sure all integral types besides size_t are not accepted into this constructor */
     Vector(T item);
     Vector(std::initializer_list<T> items);
     ~Vector();
 
     void realign(size_t n);
+    void for_each(std::function<void(T&)> call_back);
 
     void insert(T& item); // Return iterator
     void insert(T&& item);
@@ -128,7 +130,6 @@ Vector<T, alloc>::Vector(const std::initializer_list<T> items) {
 
 template<typename T, typename alloc>
 Vector<T, alloc>::~Vector() {
-    for(auto& i : *this) allocator.destroy(&i);
     allocator.deallocate(sub_data, length + n_reserve);
 }
 
@@ -141,6 +142,11 @@ void Vector<T, alloc>::realign(size_t n) {
     sub_data = allocator.allocate(length + n_reserve);
     std::memcpy(sub_data, temp_buffer, sizeof(T) * length);
     allocator.deallocate(temp_buffer, length);
+}
+
+template<typename T, typename alloc>
+void Vector<T, alloc>::for_each(std::function<void(T&)> call_back) {
+    for(auto& val : *this) call_back(val);
 }
 
 template<typename T, typename alloc>

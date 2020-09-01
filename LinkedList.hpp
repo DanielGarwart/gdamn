@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <functional>
 
+int x = 0;
+
 namespace gdamn::data {
 
 namespace {
@@ -26,7 +28,7 @@ public:
 
     LinkedList(std::initializer_list<T> list);
 
-    LinkedList(LinkedList&& other) {
+    LinkedList(LinkedList<T, alloc>&& other) {
         this->head = other.head;
         this->back = other.back;
         this->length = other.length;
@@ -34,7 +36,7 @@ public:
         other.back = nullptr;
     }
 
-    LinkedList<T>& operator=(LinkedList<T>&& other) {
+    LinkedList<T, alloc>& operator=(LinkedList<T, alloc>&& other) {
         this->head = other.head;
         this->back = other.back;
         this->length = other.length;

@@ -6,15 +6,19 @@
 
 namespace gdamn::data {
 
+namespace {
+
 template<typename T>
-struct Leaf {
-    Leaf<T>* next = nullptr;
-    Leaf<T>* prev = nullptr;
+struct DoubleNode {
+    DoubleNode<T>* next = nullptr;
+    DoubleNode<T>* prev = nullptr;
 
     T data;
 };
 
-template<typename T, typename alloc = std::allocator<Leaf<T>>>
+}
+
+template<typename T, typename alloc = std::allocator<DoubleNode<T>>>
 class LinkedList {
 public:
     LinkedList();
@@ -89,9 +93,9 @@ public:
             return curr_node->data;
         }
     private:
-        Iterator(Leaf<T>* ptr){ this->curr_node = ptr; }
+        Iterator(DoubleNode<T>* ptr){ this->curr_node = ptr; }
 
-        Leaf<T>* curr_node;
+        DoubleNode<T>* curr_node;
         friend LinkedList;
     };
 
@@ -122,8 +126,8 @@ public:
     inline Iterator end();
 
 private:
-    Leaf<T>*        head    = nullptr;
-    Leaf<T>*        back    = nullptr;
+    DoubleNode<T>*        head    = nullptr;
+    DoubleNode<T>*        back    = nullptr;
     size_t     length  = 0;
     alloc           allocator;
 };
@@ -137,7 +141,7 @@ LinkedList<T, alloc>::LinkedList() {
 
 template<typename T, typename alloc>
 LinkedList<T, alloc>::~LinkedList() {
-    Leaf<T>* itr = head->next;
+    DoubleNode<T>* itr = head->next;
     
     while(itr->next != nullptr) {
         allocator.deallocate(itr->prev, 1);
@@ -175,7 +179,7 @@ void LinkedList<T, alloc>::insert(T&& key) {
 
 template<typename T, typename alloc>
 void LinkedList<T, alloc>::insert_front(T& key) {
-    Leaf<T>* new_head = allocator.allocate(1);
+    DoubleNode<T>* new_head = allocator.allocate(1);
     new_head->data = key;
     new_head->next = head->next;
     head->next = new_head;
@@ -184,7 +188,7 @@ void LinkedList<T, alloc>::insert_front(T& key) {
 
 template<typename T, typename alloc>
 void LinkedList<T, alloc>::insert_front(T&& key) {
-    Leaf<T>* new_head = allocator.allocate(1);
+    DoubleNode<T>* new_head = allocator.allocate(1);
     new_head->data = std::move(key);
     new_head->next = head->next;
     head->next = new_head;
@@ -216,7 +220,7 @@ void LinkedList<T, alloc>::remove(T& key) {
         return;
     }
 
-    Leaf<T>* itr = head->next;
+    DoubleNode<T>* itr = head->next;
     for(auto x = 0; x < i; x++) itr = itr->next;
     // We have reached the node
     itr->prev->next = itr->next;
@@ -240,7 +244,7 @@ void LinkedList<T, alloc>::remove(T&& key) {
         return;
     }
 
-    Leaf<T>* itr = head->next;
+    DoubleNode<T>* itr = head->next;
     for(auto x = 0; x < i; x++) itr = itr->next;
     // We have reached the node
     itr->prev->next = itr->next;

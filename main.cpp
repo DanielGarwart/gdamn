@@ -2,22 +2,21 @@
 #include "Vector.hpp"
 #include "Array.hpp"
 #include "Deque.hpp"
+#include "List.hpp"
 #include <string>
 #include <iostream>
 
 using namespace gdamn::data;
 
 int main() {
-    LinkedList<int> ll;
-    
-    for(size_t i = 0; i < 100; i++)
-        ll.insert(i * 10);
-
     char l_l = false;
     std::cout << "CHOOSE LINKEDLIST (L), VECTOR(V) OR ARRAY(A): ";
     std::cin >> l_l;
 
     if(l_l == 'L') {
+        LinkedList<int> ll;
+        for(size_t i = 0; i < 100; i++)
+            ll.insert(i * 10);
         for(auto i : ll)
             std::cout << i << std::endl;
         std::cout << ll.len() << std::endl;
@@ -55,9 +54,17 @@ int main() {
     }
 
     Deque<int> deque;
-    int x = 10;
-    deque.insert(x);
-    std::cout << deque[0] << std::endl;
-    std::cout << deque.contains(10) << std::endl;
+    
+    for(int i = 0; i < 100; i++)
+    {
+        deque.insert(i);
+    }
+
+    deque.for_each([](int& a){ a *= 10; });
+    std::cout << deque.find(990) << std::endl; /* should be at last index */
+    std::cout << deque.len() << std::endl;
+    std::cout << "Deque contains 10: " << deque.contains(10) << std::endl;
+    deque.remove(10);
+    std::cout << "After removal: " << deque.contains(10) << std::endl;
     /* ... more examples here */
 }

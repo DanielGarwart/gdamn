@@ -1,13 +1,18 @@
 #pragma once
 #include <limits>
+#include <functional>
 
 namespace gdamn::data {
+
+namespace {
 
 template<typename T>
 struct Node {
     T data          = {};
     Node<T>* next   = nullptr;
 };
+
+}
 
 template<typename T>
 class List {
@@ -20,6 +25,8 @@ public:
     List<T>& operator=(List<T>& other) = delete;
 
     class Iterator;
+
+    void for_each(std::function<void(T&)> call_back);
 
     void insert(T& key);
     void insert(T&& key);
@@ -118,6 +125,11 @@ List<T>& List<T>::operator=(List<T>&& other) {
 template<typename T>
 T& List<T>::front() {
     return head->data;
+}
+
+template<typename T>
+void List<T>::for_each(std::function<void(T&)> call_back) {
+    for(auto& val : *this) call_back(val);
 }
 
 template<typename T>

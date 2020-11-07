@@ -13,6 +13,7 @@ int main() {
     char l_l = false;
     std::cout << "CHOOSE LINKEDLIST (L), VECTOR(V) OR ARRAY(A): ";
     std::cin >> l_l;
+    Enumerable<int> enumerable;
 
     if(l_l == 'L') {
         LinkedList<int> ll;
@@ -23,7 +24,7 @@ int main() {
             std::cout << i << std::endl;
         std::cout << "LinkedList length: "<< ll.len() << std::endl;
         std::cout << "Linked List contains 100: " << ll.contains(100) << std::endl;
-
+        
         ll.for_each([](int& key){
             key *= 10;
             std::cout << key << std::endl;

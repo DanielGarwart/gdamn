@@ -4,6 +4,8 @@
 #include <memory>
 #include <limits>
 #include <functional>
+#include <cstring>
+#include "Enumerable.hpp"
 
 namespace gdamn::data {
 
@@ -28,32 +30,77 @@ template<typename T, size_t n = 12>
 class Deque {
 public:
     Deque();
+    Deque(Deque&);
+
+    Deque(Deque&& other) {
+        this->chunks = other.chunks;
+        this->curr_chunk = other.curr_chunk;
+        this->n_chunks = other.n_chunks;
+        this->n_nodes = other.n_nodes;
+        other.chunks = nullptr;
+        other.curr_chunk = 0;
+        other.n_chunks = 0;
+        other.n_nodes = 0;
+    }
+
     ~Deque();
 
     /* Make use of chunk caching friendliness*/
     class Iterator { 
     public:
-        void operator++() {
+        Iterator() {}
+
+        Iterator(Iterator& itr) {
+            this->index = itr.index;
+            this->ref = itr.ref;
+        }
+
+        Iterator(Iterator&& itr) {
+            this->index = itr.index;
+            this->ref = itr.ref;
+            itr.index = 0;
+            itr.ref = nullptr;
+        }
+
+        Iterator& operator=(Iterator& other) {
+            this->index = other.index;
+            this->ref = other.ref;
+            return *this;
+        }
+
+        Iterator& operator=(Iterator&& other) {
+            this->index = other.index;
+            this->ref = other.ref;
+            this->index = 0;
+            this->ref = nullptr;
+            return *this;
+        }
+
+        Iterator& operator++() {
             index++;
+            return *this;
         }
 
-        void operator++(int) {
+        Iterator& operator++(int) {
             index++;
+            return *this;
         }
 
-        void operator--() {
+        Iterator& operator--() {
             index--;
+            return *this;
         }
 
-        void operator--(int) {
+        Iterator& operator--(int) {
             index--;
+            return *this;
         }
 
-        bool operator==(Iterator other) {
+        bool operator==(const Iterator other) const {
             return this->ref == other.ref && this->index == other.index;
         }
 
-        bool operator!=(Iterator other) {
+        bool operator!=(const Iterator other) const {
             return !(*this == other);
         }
 
@@ -78,22 +125,28 @@ public:
     void insert_back(T& val);
     void insert_back(T&& val);
 
-    /* Costly operation !!! */
+/* Under construction */
+
     void remove(T& val);
     void remove(T&& val);
     void remove_all(T& val);
     void remove_all(T&& val);
     void remove(Iterator where);
 
+/* End Constructrion*/
+
     void for_each(std::function<void(T&)> call_back);
+    Enumerable<T> where(std::function<bool(const T&)> match_func);
 
     bool contains(T& key);
     bool contains(T&& key);
     size_t find(T& key);
     size_t find(T&& key);
 
-    /* Doesn't account for front chunk yet */
-    T& operator[](size_t i) { /* equation needs improvement */
+    Iterator first_or_default(T&);
+    Iterator first_or_default(T&&);
+
+    T& operator[](size_t i) {
         i += chunks[0]->n_left;
         return chunks[i / n]->data[i % n];
     }
@@ -116,11 +169,13 @@ public:
         n_chunks += num;
     }
 
-private:
+public:
     size_t          n_chunks = 0;
     size_t          n_nodes = 0;
     size_t          curr_chunk = 1;
     Chunk<T, n>**   chunks = nullptr;
+
+    friend          typename Deque<T>::Iterator;
 };
 
 template<typename T, size_t n>
@@ -128,6 +183,7 @@ Deque<T, n>::Deque() {
     chunks = new Chunk<T, n>*[2]; /* Front chunk and first back chunk */
     chunks[0] = new Chunk<T, n>();
     chunks[0]->data = new T[n];
+    
     std::memset(chunks[0]->data, 0, sizeof(T) * n);
     chunks[1] = new Chunk<T, n>();
     chunks[1]->data = new T[n];
@@ -215,20 +271,21 @@ void Deque<T, n>::insert_front(T&& val) {
     n_nodes++;
 }
 
+/* Pretty likely to crash */
 template<typename T, size_t n>
 void Deque<T, n>::remove(T& key) {
     size_t index = find(key);
     if(index == std::numeric_limits<size_t>::max()) return; /* Key doesn't exist in chunks */
 
-    /* TODO: copy per chunk && std::memcpy */
     auto temp = new T[len() - (index + 1)]; /* Copy everything into temporary storage */
     size_t j = 0;
-    for(size_t i = index + 1, j = 0; i < len(); i++, j++)
+    for(size_t i = index + 1; i < len(); i++, j++)
         temp[j] = (*this)[i];
-    for(size_t i = index, size_t j = 0; j < (len() - (index + 1)); i++, j++)
-        (*this)[i] = temp[j];
+    for(size_t i = index, j = 0; j < (len() - (index + 1)); i++, j++) {
+        (*this)[i] = temp[j]; 
+    }
     n_nodes--;
-    chunks[n_chunks - 1]->n_left++;
+    chunks[n_chunks - 1]->n_left++; /* TODO: Consider by realign_chunk pre-allocated chunks */
     operator delete[](temp);
 }
 
@@ -252,17 +309,19 @@ void Deque<T, n>::remove(T&& key) {
 
 template<typename T, size_t n>
 void Deque<T, n>::remove(Iterator key) {
-    size_t index = key.index; /* Key doesn't exist in chunks */
-
-    /* TODO: copy per chunk && std::memcpy */
+    if(key.index >= len()) return; /* Key doesn't exist in chunks */
+    auto index = key.index; // Everything checks out; ...
+    
     auto temp = new T[len() - (index + 1)]; /* Copy everything into temporary storage */
-    for(size_t i = index + 1, size_t j = 0; i < len(); i++, j++)
+    size_t j = 0;
+    for(size_t i = index + 1; i < len(); i++, j++)
         temp[j] = (*this)[i];
-    for(size_t i = index, size_t j = 0; j < (len() - (index + 1)); i++, j++) {
+    j = 0;
+    for(size_t i = index; j < (len() - (index + 1)); i++, j++) {
         (*this)[i] = temp[j]; 
     }
     n_nodes--;
-    chunks[n_chunks - 1]->n_left++; /* TODO: Consider by realign_chunk pre-allocated chunks */
+    chunks[n_chunks - 1]->n_left++;
     operator delete[](temp);
 }
 
@@ -280,6 +339,14 @@ template<typename T, size_t n>
 void Deque<T, n>::for_each(std::function<void(T&)> call_back) {
     for(size_t i = 0; i < len(); i++)
         call_back((*this)[i]);
+}
+
+template<typename T, size_t n>
+Enumerable<T> Deque<T, n>::where(std::function<bool(const T&)> match_func) {
+    Enumerable<T> enumerable;
+    for(auto& x : *this)
+        if(match_func(x)) enumerable.insert(x); //enumerable.insert(x);
+    return enumerable;
 }
 
 template<typename T, size_t n>

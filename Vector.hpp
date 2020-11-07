@@ -2,7 +2,6 @@
 #include <initializer_list>
 #include <cstring>
 #include <limits>
-#include <memory>
 #include <functional>
 
 namespace gdamn::data {
@@ -17,58 +16,68 @@ public:
             start = ptr;
         }
 
-        void operator++(int) {
+        Iterator& operator++(int) {
             advance++;
+            return *this;
         }
 
-        void operator++() {
+        Iterator& operator++() {
             advance++;
+            return *this;
         }
 
-        void operator--(int) {
-            if(advance == 0) return;
-            advance--;
+        Iterator& operator--(int) {
+            advance -= (advance > 0);
+            return *this;
         }
 
-        void operator--() {
-            if(advance == 0) return;
-            advance--;
+        Iterator& operator--() {
+            advance -= (advance > 0);
+            return *this;
         }
 
-        void operator+=(size_t n) {
+        Iterator& operator+=(size_t n) {
             advance += n;
+            return *this;
         }
 
-        void operator-=(size_t n) {
-            advance += n;
+        Iterator& operator-=(size_t n) {
+            advance -= advance >= n ? n : advance;
+            return *this;
         }
 
-        bool operator!=(const Iterator other) const {
-            return !(
+        bool operator==(const Iterator other) const {
+            return (
                 start + advance
                 ==
                 other.start + other.advance
             );
         }
 
+        bool operator!=(const Iterator other) const {
+            return !(*this == other);
+        }
+
         T& operator*() {
             return *(start + advance);
         }
     private:
-
         T* start;
         size_t advance = 0;
-        friend Vector;
+        friend Vector<T>;
     };
 
     Vector();
     explicit Vector(size_t n); /* Make sure all integral types besides size_t are not accepted into this constructor */
     Vector(T item);
     Vector(std::initializer_list<T> items);
+    Vector(Vector&& other);
+    Vector(Vector&);
     ~Vector();
 
     void realign(size_t n);
     void for_each(std::function<void(T&)> call_back);
+    auto where(std::function<bool(T&)> match_func);
 
     void insert(T& item); // Return iterator
     void insert(T&& item);
@@ -76,17 +85,19 @@ public:
     size_t find(T& key); // Return iterator
     size_t find(T&& key);
 
-    inline bool contains(T& key); // Return iterator
+    inline bool contains(T& key);
     inline bool contains(T&& key);
     
     void remove(T& item);
     void remove(T&& item);
-    void remove(Iterator& pos);
+    void remove(Vector<T, alloc>::Iterator& pos);
 
-    inline size_t len() const;
+    inline const size_t len() const;
     inline size_t available_reserve() const;
     auto begin();
     auto end();
+    T& first() { return sub_data[0]; }
+    T& last() { return sub_data[length - 1]; }
 
     T& operator[](size_t i);
 private:
@@ -129,24 +140,41 @@ Vector<T, alloc>::Vector(const std::initializer_list<T> items) {
 }
 
 template<typename T, typename alloc>
+Vector<T, alloc>::Vector(Vector&& other) {
+    allocator.deallocate(sub_data, length + n_reserve);
+    this->sub_data = other.sub_data;
+    this->length = other.length;
+    this->n_reserve = other.n_reserve;
+    other.sub_data = nullptr;
+    other.length = 0;
+    other.n_reserve = 0;
+}
+
+template<typename T, typename alloc>
 Vector<T, alloc>::~Vector() {
+    for(size_t i = 0; i < length; i++)
+        sub_data[i].~T();
     allocator.deallocate(sub_data, length + n_reserve);
 }
 
 template<typename T, typename alloc>
 void Vector<T, alloc>::realign(size_t n) {
-    T* temp_buffer = allocator.allocate(length);
-    std::memcpy(temp_buffer, sub_data, sizeof(T) * length);
+    T* new_buffer = allocator.allocate(length + n_reserve + n);
+    std::memcpy(new_buffer, sub_data, sizeof(sub_data));
     allocator.deallocate(sub_data, length + n_reserve);
+    sub_data = new_buffer;
     n_reserve += n;
-    sub_data = allocator.allocate(length + n_reserve);
-    std::memcpy(sub_data, temp_buffer, sizeof(T) * length);
-    allocator.deallocate(temp_buffer, length);
 }
 
 template<typename T, typename alloc>
 void Vector<T, alloc>::for_each(std::function<void(T&)> call_back) {
     for(auto& val : *this) call_back(val);
+}
+
+template<typename T, typename alloc>
+auto Vector<T, alloc>::where(std::function<bool(T&)> match_func) {
+    // Enumerable<T> enumerable;
+    // for(auto& x : *this) if(match_func(x)) enumerable.insert(x);
 }
 
 template<typename T, typename alloc>
@@ -195,19 +223,14 @@ void Vector<T, alloc>::remove(T& item) {
     size_t i = find(item);
     if(i == std::numeric_limits<size_t>::max()) return;
 
-    T* lower_bounds = allocator.allocate(i);
-    T* upper_bounds = allocator.allocate(nshift);
-    std::memcpy(lower_bounds, sub_data, sizeof(T) * i);
-    std::memcpy(upper_bounds, sub_data + nshift, sizeof(T) * nshift);
+    T* new_buffer = allocator.allocate(length + n_reserve - 1);
+    std::memcpy(new_buffer, sub_data, sizeof(T) * i);
+    std::memcpy(new_buffer + i, sub_data + i + 1, sizeof(T) * (length - i - 1));
+    sub_data[i].~T();
     allocator.deallocate(sub_data, length + n_reserve);
 
-    sub_data = allocator.allocate((length - 1) + n_reserve);
-    std::memcpy(sub_data, lower_bounds, sizeof(T) * i);
-    std::memcpy(sub_data + (nshift-1), upper_bounds, sizeof(T) * nshift);
-
     length--;
-    allocator.deallocate(lower_bounds, i);
-    allocator.deallocate(upper_bounds, nshift);
+    sub_data = new_buffer;
 }
 
 template<typename T, typename alloc>
@@ -215,19 +238,14 @@ void Vector<T, alloc>::remove(T&& item) {
     size_t i = find(item);
     if(i == std::numeric_limits<size_t>::max()) return;
 
-    T* lower_bounds = allocator.allocate(i);
-    T* upper_bounds = allocator.allocate(nshift);
-    std::memcpy(lower_bounds, sub_data, sizeof(T) * i);
-    std::memcpy(upper_bounds, sub_data + nshift, sizeof(T) * nshift);
+    T* new_buffer = allocator.allocate(length + n_reserve - 1);
+    std::memcpy(new_buffer, sub_data, sizeof(T) * i);
+    std::memcpy(new_buffer + i, sub_data + i + 1, sizeof(T) * (length - i - 1));
+    sub_data[i].~T();
     allocator.deallocate(sub_data, length + n_reserve);
 
-    sub_data = allocator.allocate((length - 1) + n_reserve);
-    std::memcpy(sub_data, lower_bounds, sizeof(T) * i);
-    std::memcpy(sub_data + (nshift-1), upper_bounds, sizeof(T) * nshift);
-
     length--;
-    allocator.deallocate(lower_bounds, i);
-    allocator.deallocate(upper_bounds, nshift);
+    sub_data = new_buffer;
 }
 
 template<typename T, typename alloc>
@@ -250,7 +268,7 @@ void Vector<T, alloc>::remove(Vector<T, alloc>::Iterator& pos) {
 }
 
 template<typename T, typename alloc>
-size_t Vector<T, alloc>::len() const {
+const size_t Vector<T, alloc>::len() const {
     return length;
 }
 

@@ -4,6 +4,7 @@
 #include <limits>
 #include <cstring>
 #include <functional>
+#include "Enumerable.hpp"
 
 namespace gdamn::data {
 
@@ -19,6 +20,7 @@ public:
     Array<T, n>& operator=(Array<T, n>&& other);
 
     void for_each(std::function<void(T&)> call_back);
+    auto where(std::function<bool(const T&)> match_func);
 
     bool contains(T& key);
     bool contains(T&& key);
@@ -28,37 +30,84 @@ public:
 
     class Iterator {
     public:
-        void operator++()               { index++; }
-        void operator++(int)            { index++; }
-        void operator+=(size_t i)       { index += i; }
-        void operator-=(size_t i)       { index -= i; }
-        void operator--()               { index--; }
-        void operator--(int)            { index--; }
+        Iterator() {}
+        
+        Iterator(Iterator& itr) {
+            this->beg = itr.beg;
+            this->index = itr.index;
+        }
 
-        bool operator==(Iterator other) { 
+        Iterator(Iterator&& itr) {
+            this->beg = itr.beg;
+            this->index = itr.index;
+        }
+
+        Iterator& operator=(Iterator& other) {
+            this->beg = other.beg;
+            this->index = other.index;
+            return *this;
+        }
+
+        Iterator& operator=(Iterator&& other) {
+            this->beg = other.beg;
+            this->index = other.index;
+            other.beg = nullptr;
+            other.index = 0;
+            return *this;
+        }
+
+        Iterator& operator++() {
+            index += index < n;
+            return *this; 
+        }
+        
+        Iterator& operator++(int) { 
+            index += index < n;
+            return *this; 
+        }
+
+        Iterator& operator+=(size_t i) { 
+            index += i * (index + i < n);
+            return *this; 
+        }
+        Iterator& operator-=(size_t i) { 
+            index -= i * (index - i < 0);
+            return *this; 
+        }
+
+        Iterator& operator--() { 
+            index -= index > 0;
+            return *this; 
+        }
+
+        Iterator& operator--(int) { 
+            index -= index > 0;
+            return *this; 
+        }
+
+        bool operator==(const Iterator other) const { 
             return (this->index == other.index && this->beg == other.beg);
         }
 
-        bool operator!=(const Iterator other) {
-            return !(*this == other);
+        bool operator!=(const Iterator other) const {
+            return !(this->index == other.index && this->beg == other.beg);
         }
 
-        T& operator*() 
-        {  
+        T& operator*() {
             return beg[index]; 
         }
     private:
-        Iterator(T* beg, size_t i = 0) { this->beg = beg; index = i; }
-        friend Array;
-        T* beg;
-        size_t index;
+        Iterator(T* beg, size_t i) { this->beg = beg; index = i; }
+        friend Array<T, n>;
+        T* beg = nullptr;
+        size_t index = 0;
     };
 
-    constexpr size_t len()       { return n; }
-    T& operator[](size_t i)      { return data[i]; }
-    Iterator begin()             { return Iterator(data); }
-    Iterator end()               { return Iterator(data, len()); };
-    T* first()                   { return data; }
+    constexpr size_t len()     { return n; }
+    T& operator[](size_t i)    { return data[i]; }
+    Iterator begin()           { return Iterator(data, 0); }
+    Iterator end()             { return Iterator(data, len()); };
+    T* first()                 { return data; }
 private:
     T data[n];
 };
@@ -90,6 +139,14 @@ template<typename T, size_t n>
 void Array<T, n>::for_each(std::function<void(T&)> call_back) {
     for(auto& val : *this)
         call_back(val);
+}
+
+template<typename T, size_t n>
+auto Array<T, n>::where(std::function<bool(const T&)> match_func) {
+    Enumerable<T> enumerable;
+    for(size_t i = 0; i < len(); i++)
+        if(match_func(data[i])) enumerable.insert(data[i]);
+    return enumerable;
 }
 
 template<typename T, size_t n>

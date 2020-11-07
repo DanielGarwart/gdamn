@@ -1,21 +1,19 @@
 #pragma once
 #include <limits>
 #include <functional>
+#include "Enumerable.hpp"
 
 namespace gdamn::data {
 
-namespace {
-
-template<typename T>
-struct Node {
-    T data          = {};
-    Node<T>* next   = nullptr;
-};
-
-}
-
 template<typename T>
 class List {
+private:
+    template<typename U>
+    struct Node {
+        U data                   = {};
+        List<T>::Node<U>* next   = nullptr;
+    };
+
 public:
     List(T head = T());
     List(std::initializer_list<T> l);
@@ -24,9 +22,69 @@ public:
     List<T>& operator=(List<T>&& other);
     List<T>& operator=(List<T>& other) = delete;
 
-    class Iterator;
+    class Iterator {
+    public:
+        Iterator() {}
+        
+        Iterator(Iterator& itr) {
+            this->curr_node = itr.curr_node;
+        }
+
+        Iterator(Iterator&& itr) {
+            this->curr_node = itr.curr_node;
+            itr.curr_node = nullptr;
+        }
+
+        Iterator& operator=(List<T>::Iterator& other) {
+            this->curr_node = other.curr_node;
+            return *this;
+        }
+
+        Iterator& operator=(List<T>::Iterator&& other) {
+            this->curr_node = other.curr_node;
+            other.curr_node = nullptr;
+            return *this;
+        }
+
+        Iterator& operator++() {
+            curr_node = curr_node->next;
+            return *this;
+        }
+
+        Iterator& operator++(int) {
+            curr_node = curr_node->next;
+            return *this;
+        }
+
+        Iterator& operator+=(size_t n) {
+            for(size_t i = 0; i < n; i++)
+                this->operator++();
+            return *this;
+        }
+
+        bool operator==(const List<T>::Iterator other) const {
+            return this->curr_node == other.curr_node;
+        }
+
+        bool operator!=(const List<T>::Iterator other) {
+            return !(*this == other);
+        }
+    
+        T& operator*() {
+            return curr_node->data;
+        }
+
+    private:
+        Iterator(Node<T>* itr) {
+            this->curr_node = itr;
+        }
+
+        Node<T>* curr_node;
+        friend List<T>;
+    };
 
     void for_each(std::function<void(T&)> call_back);
+    Enumerable<T> where(std::function<bool(const T&)> match_func);
 
     void insert(T& key);
     void insert(T&& key);
@@ -40,49 +98,15 @@ public:
     bool contains(T& key);
     bool contains(T&& key);
 
-    T& front();
-
+    T& front()          { return head->data; }
     Iterator begin()    { return Iterator(head); }
     Iterator end()      { return Iterator(nullptr); };
     size_t len()        { return node_count; };
 
 private:
-    size_t node_count   = 0;
-    Node<T>* head       = nullptr;
-};
-
-template<typename T>
-class List<T>::Iterator {
-public:
-    void operator++() {
-        curr_node = curr_node->next;
-    }
-
-    void operator++(int) {
-        curr_node = curr_node->next;
-    }
-
-    void operator+=(size_t n);
-
-    bool operator==(Iterator other) {
-        return this->curr_node == other.curr_node;
-    }
-
-    bool operator!=(Iterator other) {
-        return !(*this == other);
-    }
- 
-    T& operator*() {
-        return curr_node->data;
-    }
-
-private:
-    Iterator(Node<T>* itr) {
-        this->curr_node = itr;
-    }
-
-    Node<T>* curr_node;
-    friend List<T>;
+    size_t node_count           = 0;
+    List<T>::Node<T>* head      = nullptr;
+    friend List<T>::Iterator;
 };
 
 template<typename T>
@@ -123,13 +147,16 @@ List<T>& List<T>::operator=(List<T>&& other) {
 }
 
 template<typename T>
-T& List<T>::front() {
-    return head->data;
+void List<T>::for_each(std::function<void(T&)> call_back) {
+    for(auto& val : *this) call_back(val);
 }
 
 template<typename T>
-void List<T>::for_each(std::function<void(T&)> call_back) {
-    for(auto& val : *this) call_back(val);
+Enumerable<T> List<T>::where(std::function<bool(const T&)> match_func) {
+    Enumerable<T> enumerable;
+    for(auto& x : *this)
+        if(match_func(x)) enumerable.insert(x);
+    return enumerable;
 }
 
 template<typename T>

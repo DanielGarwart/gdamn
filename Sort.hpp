@@ -1,36 +1,60 @@
+#include <concepts>
 #include <algorithm>
-#include <iterator>
-#include <utility>
+#include "Vector.hpp"
+#include "String.hpp"
 
 namespace gdamn::algorithm {
 
-template<typename container_iter, typename compare>
-auto realign(container_iter begin, container_iter end, compare comp_func) {
-    container_iter lower_bound = begin;
-    std::advance(end, -1);
+template<typename T>
+concept IsSortable = requires(T a, T b) { a < b; } || requires(T a, T b) { a > b; };
 
-    for(auto itr = begin; itr < end; std::advance(itr, 1))
-        if(comp_func(*itr, *end)) {
-            std::swap(*lower_bound,*itr);
-            std::advance(lower_bound, 1);
+template<typename T>
+concept CanBeIndexed = requires(T a, size_t i) {
+    a.operator[](i);
+};
+
+template<typename T> // Can't find a better name lol
+concept SelfSufficient = requires(T a) { a.len(); } && CanBeIndexed<T>;
+
+template<gdamn::algorithm::CanBeIndexed container, typename lambda>
+size_t partition(container& A, size_t low, size_t high, lambda comp_func) {
+    size_t i = low - 1;
+    for (size_t j = low; j < high; j++)
+        if (comp_func(A[j], A[high])) {
+            i++;
+            std::swap(A[i], A[j]);
         }
 
-    std::swap(*lower_bound,*end);
-    return lower_bound;
+    std::swap(A[i + 1], A[high]);
+    return (i + 1);
 }
-
-template<typename iter, typename compare>
-void qsort(iter begin, iter end, compare comp_func) {
-    if (begin < end) {
-        auto upper_bound = realign(begin, end, comp_func);
-        qsort(begin, upper_bound, comp_func);
-        qsort(upper_bound + 1, end, comp_func);
+ 
+template<gdamn::algorithm::CanBeIndexed Container>
+void qsort(Container& container, size_t low, size_t high) {
+    if (low < high) {
+        size_t pivot = partition(container, low, high, []<typename T>(T& left, T& right) -> bool { return left <= right; });
+        gdamn::algorithm::qsort(container, low, pivot - 1);
+        gdamn::algorithm::qsort(container, pivot + 1, high);
     }
 }
 
-template<typename container, typename compare>
-void qsort(container& c, compare comp_func) {
-    qsort(c.begin(), c.end(), comp_func);
+template<gdamn::algorithm::CanBeIndexed Container, typename lambda>
+void qsort(Container& container, size_t low, size_t high, lambda cmp_func) {
+    if (low < high) {
+        size_t pivot = partition(container, low, high, cmp_func);
+        gdamn::algorithm::qsort(container, low, pivot - 1);
+        gdamn::algorithm::qsort(container, pivot + 1, high);
+    }
+}
+
+template<gdamn::algorithm::SelfSufficient Container>
+inline void qsort(Container& container) {
+    gdamn::algorithm::qsort(container, 0, container.len() - 1);
+}
+
+template<gdamn::algorithm::SelfSufficient Container, typename lambda>
+inline void qsort(Container& container, lambda cmp_func) {
+    gdamn::algorithm::qsort(container, 0, container.len() - 1, cmp_func);
 }
 
 }

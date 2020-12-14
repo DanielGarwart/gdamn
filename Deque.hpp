@@ -71,8 +71,8 @@ public:
         Iterator& operator=(Iterator&& other) {
             this->index = other.index;
             this->ref = other.ref;
-            this->index = 0;
-            this->ref = nullptr;
+            other.index = 0;
+            other.ref = nullptr;
             return *this;
         }
 
